@@ -22,6 +22,16 @@ function InboxContent() {
   const [copied, setCopied] = useState(false)
   const [profileUrl, setProfileUrl] = useState('')
   const [activeMsg, setActiveMsg] = useState(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  useEffect(() => {
+    // Auth check
+    const stored = localStorage.getItem('unsaid_user')
+    if (!stored) { router.push('/login'); return }
+    const user = JSON.parse(stored)
+    if (user.username !== username) { router.push('/login'); return }
+  }, [username])
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -56,6 +66,19 @@ function InboxContent() {
     setMessages(msgs => msgs.map(m => m.id === id ? { ...m, is_favorite: !current } : m))
   }
 
+  function handleLogout() {
+    localStorage.removeItem('unsaid_user')
+    router.push('/login')
+  }
+
+  async function handleDeleteAccount() {
+    setDeleting(true)
+    await supabase.from('messages').delete().eq('recipient_username', username)
+    await supabase.from('profiles').delete().eq('username', username)
+    localStorage.removeItem('unsaid_user')
+    router.push('/')
+  }
+
   function copyLink() {
     navigator.clipboard.writeText(profileUrl)
     setCopied(true); setTimeout(() => setCopied(false), 3000)
@@ -86,6 +109,27 @@ function InboxContent() {
     </main>
   )
 
+  // Delete account confirmation modal
+  if (showDeleteConfirm) return (
+    <main style={{minHeight:'100vh',background:'#080B14',color:'#F1F5F9',fontFamily:'Inter,sans-serif',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px'}}>
+      <div style={{width:'100%',maxWidth:'340px',textAlign:'center'}}>
+        <p style={{fontSize:'48px',marginBottom:'16px'}}>⚠️</p>
+        <h2 style={{fontSize:'20px',fontWeight:700,marginBottom:'10px'}}>delete account?</h2>
+        <p style={{color:'#64748B',fontSize:'14px',lineHeight:1.7,marginBottom:'28px'}}>
+          this will permanently delete your profile and all {messages.length} messages. there's no going back.
+        </p>
+        <button onClick={handleDeleteAccount} disabled={deleting}
+          style={{width:'100%',padding:'14px',background:'rgba(239,68,68,0.15)',border:'1px solid rgba(239,68,68,0.4)',color:'#F87171',borderRadius:'14px',fontSize:'15px',fontWeight:600,cursor:'pointer',fontFamily:'Inter,sans-serif',marginBottom:'10px'}}>
+          {deleting ? 'deleting...' : 'yes, delete everything'}
+        </button>
+        <button onClick={() => setShowDeleteConfirm(false)}
+          style={{width:'100%',padding:'14px',background:'transparent',border:'1px solid rgba(255,255,255,0.08)',color:'#94A3B8',borderRadius:'14px',fontSize:'15px',cursor:'pointer',fontFamily:'Inter,sans-serif'}}>
+          cancel
+        </button>
+      </div>
+    </main>
+  )
+
   return (
     <main style={{minHeight:'100vh',background:'#080B14',color:'#F1F5F9',fontFamily:'Inter,system-ui,sans-serif',padding:'0 0 80px'}}>
       <style>{`
@@ -101,10 +145,16 @@ function InboxContent() {
         <div style={{maxWidth:'480px',margin:'0 auto'}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'24px'}}>
             <span style={{fontSize:'18px',fontWeight:600,letterSpacing:'0.15em',color:'#F1F5F9'}}>UNS<span style={{opacity:0.2}}>A</span>ID</span>
-            <a href={`/profile/${username}`} target="_blank" rel="noopener noreferrer"
-              style={{fontSize:'12px',color:'#8B5CF6',border:'1px solid rgba(139,92,246,0.3)',borderRadius:'20px',padding:'6px 14px',textDecoration:'none',background:'rgba(139,92,246,0.08)'}}>
-              my page ↗
-            </a>
+            <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
+              <a href={`/profile/${username}`} target="_blank" rel="noopener noreferrer"
+                style={{fontSize:'12px',color:'#8B5CF6',border:'1px solid rgba(139,92,246,0.3)',borderRadius:'20px',padding:'6px 14px',textDecoration:'none',background:'rgba(139,92,246,0.08)'}}>
+                my page ↗
+              </a>
+              <button onClick={handleLogout}
+                style={{fontSize:'12px',color:'#64748B',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'20px',padding:'6px 14px',background:'transparent',cursor:'pointer',fontFamily:'Inter,sans-serif'}}>
+                log out
+              </button>
+            </div>
           </div>
 
           {/* Profile */}
@@ -223,9 +273,17 @@ function InboxContent() {
             ))}
           </div>
         )}
+
+        {/* Delete account */}
+        <div style={{marginTop:'48px',textAlign:'center'}}>
+          <button onClick={() => setShowDeleteConfirm(true)}
+            style={{background:'transparent',border:'none',color:'#334155',fontSize:'12px',cursor:'pointer',fontFamily:'Inter,sans-serif',textDecoration:'underline'}}>
+            delete account
+          </button>
+        </div>
       </div>
 
-      <footer style={{textAlign:'center',padding:'40px 20px 0',fontSize:'12px',color:'#334155'}}>
+      <footer style={{textAlign:'center',padding:'24px 20px 0',fontSize:'12px',color:'#334155'}}>
         made in nigeria 🇳🇬 · crafted by <span style={{color:'#6D28D9'}}>ikenna ugwulor</span>
       </footer>
     </main>
