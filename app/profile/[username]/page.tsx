@@ -28,9 +28,25 @@ export default function ProfilePage() {
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase.from('profiles').select('display_name, username').eq('username', username).single()
-      if (!data) setNotFound(true)
-      else setProfile(data)
+      const { data } = await supabase
+        .from('profiles')
+        .select('display_name, username, profile_views')
+        .eq('username', username)
+        .single()
+
+      if (!data) {
+        setNotFound(true)
+        return
+      }
+
+      setProfile(data)
+
+      // increment view count — only count if not the owner viewing their own page
+      const stored = localStorage.getItem('unsaid_user')
+      const loggedInUser = stored ? JSON.parse(stored).username : null
+      if (loggedInUser !== username) {
+        await supabase.rpc('increment_views', { username_input: username })
+      }
     }
     load()
   }, [username])
@@ -38,7 +54,11 @@ export default function ProfilePage() {
   async function send() {
     if (!message.trim() || !profile) return
     setSending(true)
-    await supabase.from('messages').insert({ recipient_username: profile.username, content: message.trim(), category: detectCategory(message) })
+    await supabase.from('messages').insert({
+      recipient_username: profile.username,
+      content: message.trim(),
+      category: detectCategory(message)
+    })
     setSending(false)
     setSent(true)
   }
@@ -98,7 +118,14 @@ export default function ProfilePage() {
             {initials}
           </div>
           <h1 style={{fontSize:'24px',fontWeight:700,marginBottom:'6px'}}>{profile.display_name}</h1>
-          <p style={{color:'#64748B',fontSize:'14px'}}>send something anonymous 👀</p>
+          <p style={{color:'#64748B',fontSize:'14px',marginBottom:'8px'}}>send something anonymous 👀</p>
+
+          {/* subtle view count — only shows if views exist */}
+          {profile.profile_views > 0 && (
+            <p style={{fontSize:'11px',color:'#334155'}}>
+              👁 {profile.profile_views} {profile.profile_views === 1 ? 'person has' : 'people have'} visited this page
+            </p>
+          )}
         </div>
 
         <div style={{background:'#0F172A',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'20px',padding:'4px',marginBottom:'12px'}}>
