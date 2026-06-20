@@ -1,300 +1,135 @@
-"use client";
+'use client'
+import { useEffect, useState } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import { createClient } from '@supabase/supabase-js'
 
-import { useState } from "react";
-import { supabase } from "@/lib/supabase";
-import { useRouter } from "next/navigation";
+const supabase = createClient(
+  'https://ygqqwmjhhdgnhvjtnfjk.supabase.co',
+  'sb_publishable_qkoegnjQO-rGlFNbU6xchw_noLWt-uy'
+)
 
-export default function CreateProfilePage() {
-  const [displayName, setDisplayName] = useState("");
-  const [username, setUsername] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const router = useRouter();
+function detectCategory(text) {
+  if (/love|amazing|great|best|beautiful|awesome|kind|smart|talent|cute|funny/i.test(text)) return 'compliment'
+  if (/\?/.test(text)) return 'question'
+  if (/secret|never told|truth|actually|confession|admit|always|crush/i.test(text)) return 'confession'
+  return 'feedback'
+}
 
-  const handleUsernameChange = (val: string) => {
-    setUsername(val.toLowerCase().replace(/[^a-z0-9_]/g, ""));
-  };
+export default function ProfilePage() {
+  const params = useParams()
+  const router = useRouter()
+  const username = params.username
+  const [profile, setProfile] = useState(null)
+  const [message, setMessage] = useState('')
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
+  const [notFound, setNotFound] = useState(false)
+  const [charCount, setCharCount] = useState(0)
 
-  const handleSubmit = async () => {
-    if (!displayName.trim() || !username.trim()) {
-      setError("Please fill in both fields.");
-      return;
+  useEffect(() => {
+    async function load() {
+      const { data } = await supabase.from('profiles').select('display_name, username').eq('username', username).single()
+      if (!data) setNotFound(true)
+      else setProfile(data)
     }
-    setLoading(true);
-    setError("");
+    load()
+  }, [username])
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+  async function send() {
+    if (!message.trim() || !profile) return
+    setSending(true)
+    await supabase.from('messages').insert({ recipient_username: profile.username, content: message.trim(), category: detectCategory(message) })
+    setSending(false)
+    setSent(true)
+  }
 
-    if (!user) {
-      router.push("/");
-      return;
-    }
+  function handleChange(e) {
+    setMessage(e.target.value)
+    setCharCount(e.target.value.length)
+  }
 
-    // Check username taken
-    const { data: existing } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("username", username)
-      .single();
+  if (notFound) return (
+    <main style={{minHeight:'100vh',background:'#080B14',color:'#F1F5F9',fontFamily:'Inter,sans-serif',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'20px',textAlign:'center'}}>
+      <p style={{fontSize:'48px',marginBottom:'16px'}}>👻</p>
+      <h1 style={{fontSize:'20px',fontWeight:600,marginBottom:'8px'}}>this page doesn't exist</h1>
+      <p style={{color:'#64748B',fontSize:'14px',marginBottom:'24px'}}>maybe they haven't signed up yet?</p>
+      <button onClick={() => router.push('/')} style={{background:'#6D28D9',color:'#fff',border:'none',borderRadius:'12px',padding:'10px 24px',fontSize:'14px',cursor:'pointer',fontFamily:'Inter,sans-serif'}}>create your own →</button>
+    </main>
+  )
 
-    if (existing) {
-      setError("That username is taken. Try another.");
-      setLoading(false);
-      return;
-    }
+  if (sent) return (
+    <main style={{minHeight:'100vh',background:'#080B14',color:'#F1F5F9',fontFamily:'Inter,sans-serif',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'20px',textAlign:'center'}}>
+      <style>{`@keyframes pop{0%{transform:scale(0.5);opacity:0}70%{transform:scale(1.2)}100%{transform:scale(1);opacity:1}}`}</style>
+      <div style={{fontSize:'64px',marginBottom:'20px',animation:'pop 0.5s ease'}}>✦</div>
+      <h1 style={{fontSize:'22px',fontWeight:600,marginBottom:'10px'}}>sent. 👀</h1>
+      <p style={{color:'#64748B',fontSize:'15px',lineHeight:1.7,marginBottom:'32px',maxWidth:'260px'}}>they have no idea it was you.<br/>your secret is safe.</p>
+      <button onClick={() => { setSent(false); setMessage(''); setCharCount(0) }}
+        style={{background:'linear-gradient(135deg,#6D28D9,#A855F7)',color:'#fff',border:'none',borderRadius:'14px',padding:'14px 32px',fontSize:'15px',cursor:'pointer',fontWeight:600,fontFamily:'Inter,sans-serif',marginBottom:'12px',width:'100%',maxWidth:'300px'}}>
+        send another 🔁
+      </button>
+      <button onClick={() => router.push('/')}
+        style={{background:'transparent',color:'#64748B',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'14px',padding:'12px 32px',fontSize:'14px',cursor:'pointer',fontFamily:'Inter,sans-serif',width:'100%',maxWidth:'300px'}}>
+        create my own link
+      </button>
+    </main>
+  )
 
-    const { error: insertError } = await supabase.from("profiles").upsert({
-      id: user.id,
-      username,
-      display_name: displayName,
-    });
+  if (!profile) return (
+    <main style={{minHeight:'100vh',background:'#080B14',display:'flex',alignItems:'center',justifyContent:'center'}}>
+      <div style={{fontSize:'32px',animation:'pulse 1.5s ease-in-out infinite'}}>✦</div>
+      <style>{`@keyframes pulse{0%,100%{opacity:0.3}50%{opacity:1}}`}</style>
+    </main>
+  )
 
-    if (insertError) {
-      setError("Something went wrong. Please try again.");
-      setLoading(false);
-      return;
-    }
-
-    router.push("/inbox");
-  };
+  const initials = profile.display_name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase()
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#050505",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "24px",
-        fontFamily:
-          "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
-      {/* Atmospheric background glows */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background:
-            "radial-gradient(ellipse 60% 50% at 80% 10%, rgba(139,92,246,0.15) 0%, transparent 60%), radial-gradient(ellipse 50% 40% at 10% 80%, rgba(59,130,246,0.12) 0%, transparent 60%)",
-          pointerEvents: "none",
-        }}
-      />
+    <main style={{minHeight:'100vh',background:'#080B14',color:'#F1F5F9',fontFamily:'Inter,sans-serif',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px'}}>
+      <style>{`
+        @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes glow{0%,100%{box-shadow:0 0 30px rgba(109,40,217,0.2)}50%{box-shadow:0 0 60px rgba(109,40,217,0.5)}}
+        textarea:focus{border-color:rgba(109,40,217,0.6)!important;box-shadow:0 0 0 3px rgba(109,40,217,0.1)!important}
+        textarea{outline:none}
+      `}</style>
 
-      <div
-        style={{
-          position: "relative",
-          width: "100%",
-          maxWidth: "400px",
-          zIndex: 1,
-        }}
-      >
-        {/* Logo / wordmark */}
-        <div style={{ textAlign: "center", marginBottom: "40px" }}>
-          <div
-            style={{
-              fontSize: "13px",
-              letterSpacing: "0.2em",
-              color: "rgba(139,92,246,0.8)",
-              textTransform: "uppercase",
-              marginBottom: "12px",
-              fontWeight: 500,
-            }}
-          >
-            Create your profile
+      <div style={{width:'100%',maxWidth:'400px',animation:'slideUp 0.4s ease'}}>
+        <div style={{textAlign:'center',marginBottom:'32px'}}>
+          <div style={{width:72,height:72,borderRadius:'50%',background:'linear-gradient(135deg,#6D28D9,#22D3EE)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:'24px',fontWeight:700,margin:'0 auto 16px',animation:'glow 3s ease-in-out infinite'}}>
+            {initials}
           </div>
-          <h1
-            style={{
-              fontSize: "32px",
-              fontWeight: 700,
-              color: "#fff",
-              margin: 0,
-              letterSpacing: "-0.5px",
-            }}
-          >
-            Pick your username.
-          </h1>
-          <p
-            style={{
-              color: "rgba(255,255,255,0.4)",
-              fontSize: "14px",
-              marginTop: "10px",
-            }}
-          >
-            Your anonymous link will be ready instantly.
-          </p>
+          <h1 style={{fontSize:'24px',fontWeight:700,marginBottom:'6px'}}>{profile.display_name}</h1>
+          <p style={{color:'#64748B',fontSize:'14px'}}>send something anonymous 👀</p>
         </div>
 
-        {/* Card */}
-        <div
-          style={{
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            borderRadius: "20px",
-            padding: "32px",
-            backdropFilter: "blur(12px)",
-          }}
-        >
-          {/* Display name */}
-          <div style={{ marginBottom: "20px" }}>
-            <label
-              style={{
-                display: "block",
-                fontSize: "12px",
-                fontWeight: 500,
-                color: "rgba(255,255,255,0.5)",
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                marginBottom: "8px",
-              }}
-            >
-              Display name
-            </label>
-            <input
-              type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="Your name"
-              style={{
-                width: "100%",
-                background: "rgba(255,255,255,0.06)",
-                border: "1px solid rgba(255,255,255,0.1)",
-                borderRadius: "12px",
-                padding: "14px 16px",
-                color: "#fff",
-                fontSize: "15px",
-                outline: "none",
-                boxSizing: "border-box",
-                transition: "border-color 0.2s",
-              }}
-              onFocus={(e) =>
-                (e.target.style.borderColor = "rgba(139,92,246,0.6)")
-              }
-              onBlur={(e) =>
-                (e.target.style.borderColor = "rgba(255,255,255,0.1)")
-              }
-            />
+        <div style={{background:'#0F172A',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'20px',padding:'4px',marginBottom:'12px'}}>
+          <textarea
+            value={message}
+            onChange={handleChange}
+            maxLength={500}
+            rows={5}
+            placeholder="say something real... or don't 😈"
+            style={{width:'100%',background:'transparent',border:'none',padding:'16px',fontSize:'15px',color:'#F1F5F9',fontFamily:'Inter,sans-serif',resize:'none',lineHeight:1.6,boxSizing:'border-box'}}
+          />
+          <div style={{display:'flex',justifyContent:'flex-end',padding:'0 12px 10px'}}>
+            <span style={{fontSize:'11px',color:charCount>400?'#F87171':'#475569'}}>{charCount}/500</span>
           </div>
+        </div>
 
-          {/* Username */}
-          <div style={{ marginBottom: "28px" }}>
-            <label
-              style={{
-                display: "block",
-                fontSize: "12px",
-                fontWeight: 500,
-                color: "rgba(255,255,255,0.5)",
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                marginBottom: "8px",
-              }}
-            >
-              Username
-            </label>
-            <div style={{ position: "relative" }}>
-              <span
-                style={{
-                  position: "absolute",
-                  left: "16px",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: "rgba(139,92,246,0.7)",
-                  fontSize: "14px",
-                  fontWeight: 500,
-                  pointerEvents: "none",
-                }}
-              >
-                unsaid.app/
-              </span>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => handleUsernameChange(e.target.value)}
-                placeholder="yourname"
-                style={{
-                  width: "100%",
-                  background: "rgba(255,255,255,0.06)",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: "12px",
-                  padding: "14px 16px 14px 98px",
-                  color: "#fff",
-                  fontSize: "15px",
-                  outline: "none",
-                  boxSizing: "border-box",
-                  transition: "border-color 0.2s",
-                }}
-                onFocus={(e) =>
-                  (e.target.style.borderColor = "rgba(139,92,246,0.6)")
-                }
-                onBlur={(e) =>
-                  (e.target.style.borderColor = "rgba(255,255,255,0.1)")
-                }
-              />
-            </div>
-            {username && (
-              <p
-                style={{
-                  marginTop: "8px",
-                  fontSize: "12px",
-                  color: "rgba(139,92,246,0.7)",
-                }}
-              >
-                ✓ Your link: unsaid.app/send/{username}
-              </p>
-            )}
-          </div>
+        <button onClick={send} disabled={sending || !message.trim()}
+          style={{width:'100%',padding:'16px',background:sending||!message.trim()?'#1E293B':'linear-gradient(135deg,#6D28D9,#A855F7)',color:sending||!message.trim()?'#475569':'#fff',border:'none',borderRadius:'16px',fontSize:'16px',fontWeight:600,cursor:sending||!message.trim()?'not-allowed':'pointer',fontFamily:'Inter,sans-serif',transition:'all 0.2s',marginBottom:'20px'}}>
+          {sending ? 'sending...' : 'send anonymously ✦'}
+        </button>
 
-          {error && (
-            <p
-              style={{
-                color: "#EC4899",
-                fontSize: "13px",
-                marginBottom: "16px",
-                textAlign: "center",
-              }}
-            >
-              {error}
-            </p>
-          )}
-
-          <button
-            onClick={handleSubmit}
-            disabled={loading || !displayName || !username}
-            style={{
-              width: "100%",
-              background:
-                loading || !displayName || !username
-                  ? "rgba(139,92,246,0.3)"
-                  : "linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)",
-              border: "none",
-              borderRadius: "12px",
-              padding: "15px",
-              color: "#fff",
-              fontSize: "15px",
-              fontWeight: 600,
-              cursor:
-                loading || !displayName || !username
-                  ? "not-allowed"
-                  : "pointer",
-              transition: "opacity 0.2s, transform 0.1s",
-              letterSpacing: "0.02em",
-            }}
-            onMouseEnter={(e) => {
-              if (!loading) (e.target as HTMLButtonElement).style.opacity = "0.9";
-            }}
-            onMouseLeave={(e) => {
-              (e.target as HTMLButtonElement).style.opacity = "1";
-            }}
-          >
-            {loading ? "Creating your link…" : "Create my link →"}
-          </button>
+        <div style={{display:'flex',justifyContent:'center',gap:'20px'}}>
+          {['be kind.','be honest.','stay anonymous.'].map(t => (
+            <span key={t} style={{fontSize:'12px',color:'#334155'}}>{t}</span>
+          ))}
         </div>
       </div>
-    </div>
-  );
+
+      <p style={{position:'fixed',bottom:'20px',fontSize:'11px',color:'#1E293B'}}>
+        made in nigeria 🇳🇬 · unsaid
+      </p>
+    </main>
+  )
 }
