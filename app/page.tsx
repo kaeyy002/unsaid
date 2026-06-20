@@ -13,20 +13,23 @@ export default function Home() {
   const [step, setStep] = useState('landing')
   const [username, setUsername] = useState('')
   const [displayName, setDisplayName] = useState('')
+  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   async function createProfile() {
-    if (!username.trim() || !displayName.trim()) return
+    if (!username.trim() || !displayName.trim() || !password.trim()) return
+    if (password.length < 6) { setError('password must be at least 6 characters'); return }
     setLoading(true)
     setError('')
     const slug = username.toLowerCase().replace(/[^a-z0-9_]/g, '')
-    const { error: err } = await supabase.from('profiles').insert({ username: slug, display_name: displayName.trim() })
+    const { error: err } = await supabase.from('profiles').insert({ username: slug, display_name: displayName.trim(), password: password })
     if (err) {
       setError(err.code === '23505' ? 'that username is taken. try another.' : `error: ${err.message}`)
       setLoading(false)
       return
     }
+    localStorage.setItem('unsaid_user', JSON.stringify({ username: slug, display_name: displayName.trim() }))
     router.push(`/inbox?username=${slug}`)
   }
 
@@ -43,6 +46,7 @@ export default function Home() {
           <input type="text" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Ikenna"
             style={{width:'100%',background:'#0F172A',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'12px',padding:'13px 16px',fontSize:'15px',color:'#F1F5F9',fontFamily:'Inter,sans-serif',boxSizing:'border-box',transition:'all 0.2s'}}/>
         </div>
+
         <div style={{marginBottom:'16px'}}>
           <label style={{fontSize:'12px',color:'#64748B',marginBottom:'8px',display:'block'}}>username</label>
           <div style={{display:'flex',alignItems:'center',background:'#0F172A',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'12px',padding:'13px 16px',transition:'all 0.2s'}}>
@@ -52,12 +56,26 @@ export default function Home() {
               style={{flex:1,background:'transparent',border:'none',color:'#F1F5F9',fontSize:'15px',fontFamily:'Inter,sans-serif',outline:'none'}}/>
           </div>
         </div>
+
+        <div style={{marginBottom:'16px'}}>
+          <label style={{fontSize:'12px',color:'#64748B',marginBottom:'8px',display:'block'}}>password</label>
+          <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="min. 6 characters"
+            style={{width:'100%',background:'#0F172A',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'12px',padding:'13px 16px',fontSize:'15px',color:'#F1F5F9',fontFamily:'Inter,sans-serif',boxSizing:'border-box',transition:'all 0.2s'}}/>
+        </div>
+
         {error && <p style={{color:'#F87171',fontSize:'13px',marginBottom:'12px',background:'rgba(239,68,68,0.1)',padding:'10px 14px',borderRadius:'10px'}}>{error}</p>}
-        <button onClick={createProfile} disabled={loading||!username||!displayName}
-          style={{width:'100%',padding:'15px',background:loading||!username||!displayName?'#1E293B':'linear-gradient(135deg,#6D28D9,#A855F7)',color:loading||!username||!displayName?'#475569':'#fff',border:'none',borderRadius:'14px',fontSize:'15px',fontWeight:600,cursor:loading||!username||!displayName?'not-allowed':'pointer',fontFamily:'Inter,sans-serif',marginTop:'8px',transition:'all 0.2s'}}>
+
+        <button onClick={createProfile} disabled={loading||!username||!displayName||!password}
+          style={{width:'100%',padding:'15px',background:loading||!username||!displayName||!password?'#1E293B':'linear-gradient(135deg,#6D28D9,#A855F7)',color:loading||!username||!displayName||!password?'#475569':'#fff',border:'none',borderRadius:'14px',fontSize:'15px',fontWeight:600,cursor:loading||!username||!displayName||!password?'not-allowed':'pointer',fontFamily:'Inter,sans-serif',marginTop:'8px',transition:'all 0.2s'}}>
           {loading ? 'creating...' : 'create my link →'}
         </button>
-        <p style={{fontSize:'11px',color:'#334155',textAlign:'center',marginTop:'24px'}}>made in nigeria 🇳🇬 · crafted by ikenna ugwulor</p>
+
+        <p style={{fontSize:'13px',color:'#475569',textAlign:'center',marginTop:'20px'}}>
+          already have an account?{' '}
+          <span onClick={() => router.push('/login')} style={{color:'#8B5CF6',cursor:'pointer'}}>sign in →</span>
+        </p>
+
+        <p style={{fontSize:'11px',color:'#334155',textAlign:'center',marginTop:'16px'}}>made in nigeria 🇳🇬 · crafted by ikenna ugwulor</p>
       </div>
     </main>
   )
@@ -71,10 +89,16 @@ export default function Home() {
 
       <nav style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'20px 24px',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
         <span style={{fontSize:'16px',fontWeight:700,letterSpacing:'0.15em'}}>UNS<span style={{opacity:0.2}}>A</span>ID</span>
-        <button onClick={() => setStep('signup')}
-          style={{background:'transparent',color:'#94A3B8',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'20px',padding:'8px 18px',fontSize:'13px',cursor:'pointer',fontFamily:'Inter,sans-serif'}}>
-          sign up
-        </button>
+        <div style={{display:'flex',gap:'8px'}}>
+          <button onClick={() => router.push('/login')}
+            style={{background:'transparent',color:'#94A3B8',border:'1px solid rgba(255,255,255,0.08)',borderRadius:'20px',padding:'8px 18px',fontSize:'13px',cursor:'pointer',fontFamily:'Inter,sans-serif'}}>
+            sign in
+          </button>
+          <button onClick={() => setStep('signup')}
+            style={{background:'linear-gradient(135deg,#6D28D9,#A855F7)',color:'#fff',border:'none',borderRadius:'20px',padding:'8px 18px',fontSize:'13px',cursor:'pointer',fontFamily:'Inter,sans-serif',fontWeight:600}}>
+            sign up
+          </button>
+        </div>
       </nav>
 
       <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'40px 24px',textAlign:'center'}}>
