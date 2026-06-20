@@ -9,7 +9,7 @@ const supabase = createClient(
 )
 
 // 🔒 Change this to your own username
-const ADMIN_USERNAME = 'ikenna'
+const ADMIN_USERNAME = 'talktokaey'
 
 export default function AdminPage() {
   const router = useRouter()
